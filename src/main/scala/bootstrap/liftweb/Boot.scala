@@ -8,11 +8,14 @@ import http.{ LiftRules, NotFoundAsTemplate, ParsePath }
 import sitemap.{ SiteMap, Menu, Loc }
 import util.{ NamedPF }
 
+
 class Boot {
+  
+
   def boot {
 
     // where to search snippet
-    LiftRules.addToPackages("de.batalski")
+    LiftRules.addToPackages("de.batalski.twisscala")
 
     // build sitemap
     val entries = List(Menu("Home") / "index") :::
@@ -27,6 +30,8 @@ class Boot {
 
     // set character encoding
     LiftRules.early.append(_.setCharacterEncoding("UTF-8"))
-
+        
   }
+  
+
 }

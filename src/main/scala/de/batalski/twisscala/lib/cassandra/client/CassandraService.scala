@@ -1,7 +1,7 @@
 /**
  *
  */
-package de.batalski.lib.cassandra.client
+package de.batalski.twisscala.lib.cassandra.client
 import scala.collection.JavaConversions._
 import me.prettyprint.cassandra.service.CassandraHostConfigurator
 import me.prettyprint.cassandra.serializers.StringSerializer
@@ -14,6 +14,7 @@ import me.prettyprint.hector.api.query.QueryResult
 import scala.collection.immutable.HashMap
 import me.prettyprint.hector.api.beans.HColumn
 import scala.collection.immutable.TreeMap
+
 /**
  * @author gena
  *
@@ -43,9 +44,9 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
   cassandraHostConfigurator.setMaxWaitTimeWhenExhausted(MAXWAITTIMEWHENEXHAUSTED)
   cassandraHostConfigurator.setRetryDownedHosts(true)
 
-  val _cluster = HFactory.getOrCreateCluster(clusterName, cassandraHostConfigurator)
+  private val _cluster = HFactory.getOrCreateCluster(clusterName, cassandraHostConfigurator)
   createKeyspaceIfAbsent(keyspace)
-  val _keyspace = HFactory.createKeyspace(keyspace, _cluster)
+  private val _keyspace = HFactory.createKeyspace(keyspace, _cluster)
 
   /**
    *
@@ -148,7 +149,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
    */
   def readColumns(key: String, columns: Array[String], columnFamily: String): Map[String, String] =
     {
-      val results = new HashMap[String, String]()
+      val results = HashMap[String, String]()
 
       val sliceQuery = HFactory.createSliceQuery(_keyspace, SE, SE, SE)
       sliceQuery.setColumnFamily(columnFamily).setKey(key).setColumnNames(columns: _*)
@@ -164,6 +165,30 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
         }
       }
 
+      results
+    }
+
+  def readColumns(keys: Array[String], columns: Array[String], columnFamily: String): Map[String, Map[String, String]] =
+    {
+      val results = HashMap[String, Map[String, String]]()
+
+      val sliceQuery = HFactory.createMultigetSliceQuery(_keyspace, SE, SE, SE)
+      sliceQuery.setColumnFamily(columnFamily).setKeys(keys: _*).setColumnNames(columns: _*)
+
+      val columnSlice = sliceQuery.execute().get()
+
+      for (row <- columnSlice) {
+        val cols = HashMap[String,String]()
+        results + ((row.getKey,cols))
+        for(column <- columns) {
+          def hColumn = row.getColumnSlice.getColumnByName(column)
+          if (null == hColumn) {
+            cols + ((column, ""))
+          } else {
+            cols + ((column, hColumn.getValue()))
+          }
+        }
+      }
       results
     }
 
@@ -221,7 +246,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
    * @return
    */
   def readSubColumns(key: String, columns: Array[String], superColumn: String, columnFamily: String): Map[String, String] = {
-    val results = new HashMap[String, String]
+    val results = HashMap[String, String]()
 
     val subSliceQuery = HFactory.createSubSliceQuery(_keyspace, SE, SE, SE, SE)
     subSliceQuery.setColumnFamily(columnFamily).setSuperColumn(superColumn).setKey(key).setColumnNames(columns: _*)
@@ -231,9 +256,9 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
     for (column <- columns) {
       val hColumn = columnSlice.getColumnByName(column)
       if (null == hColumn) {
-        results.put(column, "")
+        results + ((column, ""))
       } else {
-        results.put(column, hColumn.getValue())
+        results + ((column, hColumn.getValue()))
       }
     }
 
@@ -249,7 +274,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
    * @return
    */
   def readSuperColumns(key: String, superColumn: String, columnFamily: String): Map[String, String] = {
-    val results = new HashMap[String, String]
+    val results = HashMap[String, String]()
 
     val superColumnQuery = HFactory.createSuperColumnQuery(_keyspace, SE, SE, SE, SE)
 
@@ -262,7 +287,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
     }
 
     for (column <- sColumn.getColumns()) {
-      results.put(column.getName(), column.getValue());
+      results + ((column.getName(), column.getValue()))
     }
     results;
   }
@@ -409,7 +434,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
     }
 
     for (row <- rows.getList().filterNot(_.getKey().equals(startKey))) {
-      result.add(row.getKey())
+      result + row.getKey
     }
     return result
   }
@@ -451,14 +476,14 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
 
     // get the row
     val row = rows.getList().get(0)
-    val columns = row.getColumnSlice()
+    val columns = row.getColumnSlice
 
     if (null == columns) {
       return result
     }
 
     for (column <- columns.getColumns()) {
-      result.put(column.getName(), column.getValue());
+      result + ((column.getName, column.getValue));
     }
 
     return result;
@@ -518,7 +543,7 @@ class CassandraService(val host: String, val port: Int, val clusterName: String,
     }
 
     for (column <- columns.getColumns().filterNot(_.getName().equals(startColumn))) {
-      result.put(column.getName(), column.getValue())
+      result + ((column.getName(), column.getValue()))
     }
 
     return result;
